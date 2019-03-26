@@ -1285,6 +1285,7 @@ class ZooKeeper(object):
     TRUE = 'true'
     FALSE = 'false'
     COLLECTION = 'collection'
+    COLLECTIONS = '/collections'
 
     def __init__(self, zkServerAddress, timeout=15, max_retries=-1, kazoo_client=None):
         if KazooClient is None:
@@ -1303,6 +1304,14 @@ class ZooKeeper(object):
         else:
             self.zk = kazoo_client
 
+        collections = self.zk.get_children(ZooKeeper.COLLECTIONS)
+        for collection in collections:
+            path = ZooKeeper.COLLECTIONS + "/" + collection + "/state.json"
+
+            @self.zk.DataWatch(path)
+            def watchCollectionState(data):
+                self.collections.update(json.loads(data.decode("UTF-8")))
+
         self.zk.start()
 
         def connectionListener(state):
@@ -1312,13 +1321,13 @@ class ZooKeeper(object):
                 self.state = state
         self.zk.add_listener(connectionListener)
 
-        @self.zk.DataWatch(ZooKeeper.CLUSTER_STATE)
-        def watchClusterState(data, *args, **kwargs):
-            if not data:
-                LOG.warning("No cluster state available: no collections defined?")
-            else:
-                self.collections = json.loads(data.decode('utf-8'))
-                LOG.info('Updated collections: %s', self.collections)
+        # @self.zk.DataWatch(ZooKeeper.CLUSTER_STATE)
+        # def watchClusterState(data, *args, **kwargs):
+        #     if not data:
+        #         LOG.warning("No cluster state available: no collections defined?")
+        #     else:
+        #         self.collections = json.loads(data.decode('utf-8'))
+        #         LOG.info('Updated collections: %s', self.collections)
 
         @self.zk.ChildrenWatch(ZooKeeper.LIVE_NODES_ZKNODE)
         def watchLiveNodes(children):
